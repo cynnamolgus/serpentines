@@ -20,7 +20,7 @@ cargo build
 cargo run -p serpentines-app
 ```
 
-## Roadmap (high level)
+## Roadmap
 - **Cursor Trails 1.0**: Smooth, low‑latency trails with presets (color/shape/decay), per‑monitor support, and quick toggles.
 - **Preset Ecosystem**: Import/export shareable trail packs (human‑readable format + optional assets).
 - **Control Panel**: Native settings window for live tweaking and managing presets.
