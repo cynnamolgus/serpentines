@@ -1,0 +1,10 @@
+[package]
+name = "serpentines-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serpentines-platform = { path = "../serpentines-platform" }
+serpentines-win = { path = "../serpentines-win" }
