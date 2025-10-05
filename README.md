@@ -6,6 +6,7 @@ Status: early preview. The immediate focus is a polished cursor‑trails experie
 
 ## Crates
 - `serpentines-core/`: engine logic (particles, presets, serialization)
+- `serpentines-ui/`: eframe-driven main window UI logic
 - `serpentines-platform/`: platform abstraction traits
 - `serpentines-win/`: Windows implementations (overlay, input, tray)
 - `serpentines-app/`: application entry point
