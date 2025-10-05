@@ -2,6 +2,7 @@
 name = "serpentines-core"
 version = "0.1.0"
 edition = "2021"
+authors = ["cynnamolgus"]
 
 [dependencies]
 serde = { workspace = true }

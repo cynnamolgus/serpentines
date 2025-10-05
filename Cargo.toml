@@ -4,13 +4,14 @@ members = [
     "crates/serpentines-platform",
     "crates/serpentines-win",
     "crates/serpentines-app",
+    "crates/serpentines-ui",
 ]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
 license = "MIT"
-authors = ["Serpentines Project Contributors"]
+authors = ["cynnamolgus"]
 
 [workspace.dependencies]
 tracing = "0.1"

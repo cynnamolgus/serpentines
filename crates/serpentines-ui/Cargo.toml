@@ -1,0 +1,17 @@
+[package]
+name = "serpentines-ui"
+version = "0.1.0"
+edition = "2021"
+authors = ["cynnamolgus"]
+
+[dependencies]
+tracing = { workspace = true }
+eframe = { version = "0.32", features = ["default_fonts", "wgpu"] }
+egui = "0.32"
+crossbeam-channel = "0.5"
+winit = "0.30"
+raw-window-handle = "0.6"
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+] }

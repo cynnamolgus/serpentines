@@ -2,6 +2,7 @@
 name = "serpentines-platform"
 version = "0.1.0"
 edition = "2021"
+authors = ["cynnamolgus"]
 
 [dependencies]
 tracing = { workspace = true }
