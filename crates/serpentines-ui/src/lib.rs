@@ -1,8 +1,8 @@
 use crossbeam_channel::{Receiver, Sender};
 use tracing::info;
-use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 #[cfg(target_os = "windows")]
 use winit::platform::windows::EventLoopBuilderExtWindows;
+use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 pub enum UiCommand {
     Show,
@@ -33,7 +33,8 @@ pub fn spawn_ui_thread() -> UiHandles {
             "Serpentines",
             native_options,
             Box::new(move |creation_context| {
-                let (_pending_command_sender, pending_command_receiver) = crossbeam_channel::unbounded::<UiCommand>();
+                let (_pending_command_sender, pending_command_receiver) =
+                    crossbeam_channel::unbounded::<UiCommand>();
                 #[cfg(target_os = "windows")]
                 let hwnd_from_context_value: Option<isize> = {
                     if let Ok(window_handle) = creation_context.window_handle() {
@@ -57,8 +58,10 @@ pub fn spawn_ui_thread() -> UiHandles {
                                 info!("UI forwarder: Show -> OS Show + Visible(true) + Focus");
                                 #[cfg(target_os = "windows")]
                                 if let Some(hwnd_val) = hwnd_from_context_value {
-                                    use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SetForegroundWindow, SW_SHOW};
                                     use windows::Win32::Foundation::HWND;
+                                    use windows::Win32::UI::WindowsAndMessaging::{
+                                        SetForegroundWindow, ShowWindow, SW_SHOW,
+                                    };
                                     let hwnd = HWND(hwnd_val as *mut core::ffi::c_void);
                                     unsafe {
                                         let _ = ShowWindow(hwnd, SW_SHOW);
@@ -78,10 +81,14 @@ pub fn spawn_ui_thread() -> UiHandles {
                     event_sender,
                 }))
             }),
-        ).expect("eframe failed to start");
+        )
+        .expect("eframe failed to start");
     });
 
-    UiHandles { command_sender, event_receiver }
+    UiHandles {
+        command_sender,
+        event_receiver,
+    }
 }
 
 pub struct SerpentinesApp {
