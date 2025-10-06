@@ -1,5 +1,5 @@
 //! Windows platform implementations (stubs) for Serpentines.
-use serpentines_platform::{GpuRenderer, InputSource, OverlayManager, Result, SystemTray};
+use serpentines_platform::{GpuRenderer, InputSource, OverlayManager, Result};
 use tracing::{info, warn};
 
 mod overlay;

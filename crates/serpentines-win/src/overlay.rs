@@ -16,7 +16,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 pub const OVERLAY_WINDOW_CLASS_NAME: PCWSTR = windows::core::w!("SerpentinesOverlayClass");
 
 struct DisplayOverlay {
-    hwnd_value: isize,
+    window_handle_value: isize,
     rect: MonitorRect,
 }
 
@@ -36,14 +36,14 @@ unsafe fn register_overlay_window_class(hinstance: HINSTANCE) -> PCWSTR {
 }
 
 impl DisplayOverlay {
-    fn hwnd(&self) -> HWND {
-        HWND(self.hwnd_value as *mut c_void)
+    fn window_handle(&self) -> HWND {
+        HWND(self.window_handle_value as *mut c_void)
     }
 }
 
 pub struct WinOverlayManager {
-    hinstance_value: isize,
-    class_name_ptr: isize,
+    instance_handle_value: isize,
+    class_name_pointer: isize,
     overlays: HashMap<isize, DisplayOverlay>,
     monitor_rects: Vec<MonitorRect>,
 }
@@ -52,8 +52,8 @@ impl WinOverlayManager {
     pub fn new(hinstance: HINSTANCE) -> Self {
         let class_name = unsafe { register_overlay_window_class(hinstance) };
         Self {
-            hinstance_value: hinstance.0 as isize,
-            class_name_ptr: class_name.0 as isize,
+            instance_handle_value: hinstance.0 as isize,
+            class_name_pointer: class_name.0 as isize,
             overlays: HashMap::new(),
             monitor_rects: Vec::new(),
         }
@@ -76,23 +76,23 @@ impl WinOverlayManager {
             match self.overlays.get_mut(id) {
                 Some(current) => {
                     unsafe {
-                        update_overlay_window(current.hwnd(), rect)?;
+                        update_overlay_window(current.window_handle(), rect)?;
                     }
                     current.rect = *rect;
                 }
                 None => {
-                    let hwnd = unsafe {
+                    let window_handle = unsafe {
                         create_overlay_hwnd(
                             self as *mut WinOverlayManager,
-                            self.hinstance_value,
-                            self.class_name_ptr,
+                            self.instance_handle_value,
+                            self.class_name_pointer,
                             rect,
                         )?
                     };
                     self.overlays.insert(
                         *id,
                         DisplayOverlay {
-                            hwnd_value: hwnd.0 as isize,
+                            window_handle_value: window_handle.0 as isize,
                             rect: *rect,
                         },
                     );
@@ -151,53 +151,52 @@ impl WinOverlayManager {
 
     fn enumerate_monitors() -> Result<Vec<(isize, MonitorRect)>> {
         unsafe extern "system" fn enum_proc(
-            hmonitor: HMONITOR,
+            monitor_handle: HMONITOR,
             _hdc: HDC,
             _lprc: *mut RECT,
-            lparam: LPARAM,
+            long_parameter: LPARAM,
         ) -> BOOL {
-            let data_ptr = lparam.0 as *mut Vec<(isize, MonitorRect)>;
-            if data_ptr.is_null() {
+            let monitor_data_pointer = long_parameter.0 as *mut Vec<(isize, MonitorRect)>;
+            if monitor_data_pointer.is_null() {
                 return BOOL(0);
             }
-            let data = &mut *data_ptr;
-            let mut info = MONITORINFO {
+            let monitor_data = &mut *monitor_data_pointer;
+            let mut monitor_info = MONITORINFO {
                 cbSize: size_of::<MONITORINFO>() as u32,
                 ..Default::default()
             };
-            if !GetMonitorInfoW(hmonitor, &mut info).as_bool() {
+            if !GetMonitorInfoW(monitor_handle, &mut monitor_info).as_bool() {
                 return BOOL(1);
             }
-            let rect = info.rcMonitor;
+            let rect = monitor_info.rcMonitor;
             let width = rect.right - rect.left;
             let height = rect.bottom - rect.top;
-            let mut dpi_x = 96u32;
-            let mut dpi_y = 96u32;
-            if let Err(err) = GetDpiForMonitor(hmonitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y)
-            {
+            let mut horizontal_dpi = 96u32;
+            let mut vertical_dpi = 96u32;
+            if let Err(err) = GetDpiForMonitor(monitor_handle, MDT_EFFECTIVE_DPI, &mut horizontal_dpi, &mut vertical_dpi) {
                 warn!(
                     "GetDpiForMonitor failed for monitor {:?}: {err}",
-                    hmonitor.0
+                    monitor_handle.0
                 );
-                dpi_x = 96;
+                horizontal_dpi = 96;
             }
-            data.push((
-                hmonitor.0 as isize,
+            monitor_data.push((
+                monitor_handle.0 as isize,
                 MonitorRect {
                     x: rect.left,
                     y: rect.top,
                     width,
                     height,
-                    dpi: dpi_x,
+                    dpi: horizontal_dpi,
                 },
             ));
             BOOL(1)
         }
 
         let mut monitors: Vec<(isize, MonitorRect)> = Vec::new();
-        let lparam = LPARAM(&mut monitors as *mut _ as isize);
+        let long_parameter = LPARAM(&mut monitors as *mut _ as isize);
         unsafe {
-            let result = EnumDisplayMonitors(None, None, Some(enum_proc), lparam);
+            let result = EnumDisplayMonitors(None, None, Some(enum_proc), long_parameter);
             if result == BOOL(0) {
                 return Err(Error::from_win32().into());
             }
@@ -206,8 +205,8 @@ impl WinOverlayManager {
     }
 
     unsafe fn destroy_overlay(&self, id: isize, overlay: DisplayOverlay) {
-        SetWindowLongPtrW(overlay.hwnd(), GWLP_USERDATA, 0);
-        if let Err(err) = DestroyWindow(overlay.hwnd()) {
+        SetWindowLongPtrW(overlay.window_handle(), GWLP_USERDATA, 0);
+        if let Err(err) = DestroyWindow(overlay.window_handle()) {
             warn!("DestroyWindow failed for overlay {id:?}: {err}");
         }
     }
@@ -232,19 +231,19 @@ impl OverlayManager for WinOverlayManager {
 }
 
 pub unsafe extern "system" fn handle_overlay_window_message(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
+    window_handle: HWND,
+    message: u32,
+    word_parameter: WPARAM,
+    long_parameter: LPARAM,
 ) -> LRESULT {
-    match msg {
+    match message {
         WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
         WM_DEVICECHANGE | WM_DISPLAYCHANGE | WM_DPICHANGED | WM_SETTINGCHANGE => {
-            let manager_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WinOverlayManager;
+            let manager_ptr = GetWindowLongPtrW(window_handle, GWLP_USERDATA) as *mut WinOverlayManager;
             if !manager_ptr.is_null() {
                 let manager = &mut *manager_ptr;
-                let reason = match msg {
-                    WM_DEVICECHANGE => match wparam.0 as u32 {
+                let reason = match message {
+                    WM_DEVICECHANGE => match word_parameter.0 as u32 {
                         DBT_DEVICEARRIVAL => "device arrival",
                         DBT_DEVICEREMOVECOMPLETE => "device removal",
                         DBT_DEVNODES_CHANGED => "device nodes changed",
@@ -257,24 +256,24 @@ pub unsafe extern "system" fn handle_overlay_window_message(
                 };
                 manager.handle_environment_change(reason);
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            DefWindowProcW(window_handle, message, word_parameter, long_parameter)
         }
         WM_DESTROY => {
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            SetWindowLongPtrW(window_handle, GWLP_USERDATA, 0);
+            DefWindowProcW(window_handle, message, word_parameter, long_parameter)
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => DefWindowProcW(window_handle, message, word_parameter, long_parameter),
     }
 }
 
 unsafe fn create_overlay_hwnd(
-    manager_ptr: *mut WinOverlayManager,
-    hinstance_value: isize,
-    class_name_ptr: isize,
+    manager_pointer: *mut WinOverlayManager,
+    instance_handle_value: isize,
+    class_name_pointer: isize,
     rect: &MonitorRect,
 ) -> Result<HWND> {
-    let hinstance = HINSTANCE(hinstance_value as *mut core::ffi::c_void);
-    let hwnd = CreateWindowExW(
+    let hinstance = HINSTANCE(instance_handle_value as *mut core::ffi::c_void);
+    let window_handle = CreateWindowExW(
         WINDOW_EX_STYLE(
             WS_EX_LAYERED.0
                 | WS_EX_TRANSPARENT.0
@@ -282,7 +281,7 @@ unsafe fn create_overlay_hwnd(
                 | WS_EX_TOOLWINDOW.0
                 | WS_EX_NOACTIVATE.0,
         ),
-        PCWSTR(class_name_ptr as *const u16),
+        PCWSTR(class_name_pointer as *const u16),
         windows::core::w!("Serpentines Overlay"),
         WS_POPUP,
         rect.x,
@@ -294,16 +293,16 @@ unsafe fn create_overlay_hwnd(
         hinstance,
         None,
     )?;
-    SetWindowLongPtrW(hwnd, GWLP_USERDATA, manager_ptr as isize);
-    update_overlay_window(hwnd, rect)?;
-    SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA)?;
-    Ok(hwnd)
+    SetWindowLongPtrW(window_handle, GWLP_USERDATA, manager_pointer as isize);
+    update_overlay_window(window_handle, rect)?;
+    SetLayeredWindowAttributes(window_handle, COLORREF(0), 255, LWA_ALPHA)?;
+    Ok(window_handle)
 }
 
-unsafe fn update_overlay_window(hwnd: HWND, rect: &MonitorRect) -> Result<()> {
+unsafe fn update_overlay_window(window_handle: HWND, rect: &MonitorRect) -> Result<()> {
     let flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
     SetWindowPos(
-        hwnd,
+        window_handle,
         HWND_TOPMOST,
         rect.x,
         rect.y,
