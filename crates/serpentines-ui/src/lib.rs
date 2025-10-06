@@ -3,6 +3,7 @@ use tracing::info;
 #[cfg(target_os = "windows")]
 use winit::platform::windows::EventLoopBuilderExtWindows;
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+use image;
 
 pub enum UiCommand {
     Show,
@@ -22,7 +23,14 @@ pub fn spawn_ui_thread() -> UiHandles {
     let (event_sender, event_receiver) = crossbeam_channel::unbounded::<UiEvent>();
 
     std::thread::spawn(move || {
+        let ico_bytes = include_bytes!("../../../assets/icon.ico");
+        let img = image::load_from_memory_with_format(ico_bytes, image::ImageFormat::Ico).expect("Failed to load icon").to_rgba8();
+        let rgba = img.as_raw().clone();
+        let width = img.width();
+        let height = img.height();
         let mut native_options = eframe::NativeOptions::default();
+        let viewport = egui::ViewportBuilder::default().with_icon(egui::IconData { rgba, width, height });
+        native_options.viewport = viewport;
         native_options.event_loop_builder = Some(Box::new(|builder| {
             #[cfg(target_os = "windows")]
             {

@@ -6,13 +6,14 @@ mod overlay;
 use crate::overlay::WinOverlayManager;
 use windows::Win32::Foundation::{HINSTANCE, HWND};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::Win32::UI::WindowsAndMessaging::{MSG, PeekMessageW, TranslateMessage, DispatchMessageW, WM_QUIT, PM_REMOVE, PostQuitMessage, WaitMessage};
 
 use crossbeam_channel::Sender as CbSender;
 use serpentines_ui::{spawn_ui_thread, UiCommand};
 use std::sync::{Arc, Mutex};
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem};
 use tray_icon::{Icon, MouseButton, TrayIconBuilder, TrayIconEvent};
+use image;
 
 // Public app entry ----------------
 /// Start the Windows message loop, create tray icon, overlay, and a placeholder control panel.
@@ -132,13 +133,12 @@ impl GpuRenderer for WinGpuRenderer {
 // --------------- tray-icon integration ---------------
 
 fn create_tray_icon() -> Result<(tray_icon::TrayIcon, MenuId, MenuId)> {
-    // Placeholder 16x16 white square icon
-    let (w, h) = (16, 16);
-    let mut rgba = vec![0u8; (w * h * 4) as usize];
-    for px in rgba.chunks_exact_mut(4) {
-        px.copy_from_slice(&[255, 255, 255, 255]);
-    }
-    let icon = Icon::from_rgba(rgba, w, h).map_err(box_err)?;
+    let ico_bytes = include_bytes!("../../../assets/icon.ico");
+    let img = image::load_from_memory_with_format(ico_bytes, image::ImageFormat::Ico).expect("Failed to load icon").to_rgba8();
+    let rgba = img.as_raw().clone();
+    let width = img.width();
+    let height = img.height();
+    let icon = Icon::from_rgba(rgba, width, height).map_err(box_err)?;
 
     let menu = Menu::new();
     let settings_item = MenuItem::new("Open Settings", true, None);
